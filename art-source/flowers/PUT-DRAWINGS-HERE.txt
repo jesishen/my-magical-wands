@@ -1,0 +1,8 @@
+Put your full-size flowers drawings in this folder (PNG, any size).
+
+Then run:  npm run compress flowers
+
+That resizes to 256px, converts to WebP, writes into public/art/flowers/,
+and regenerates the manifest automatically.
+
+Do not edit public/art/flowers/ by hand — it gets overwritten.

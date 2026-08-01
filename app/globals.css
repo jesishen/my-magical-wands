@@ -1,0 +1,338 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background: #0b0f0c;
+  color: #f3efe6;
+  overflow: hidden;
+  overscroll-behavior: none;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  --accent: #f0b4c4;
+}
+
+.stage video,
+.stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Mirror the camera so it reads like a mirror, not a video call. */
+.stage video { transform: scaleX(-1); }
+
+/* ---------- start screen ---------- */
+
+.start {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  text-align: center;
+  padding: 24px;
+}
+
+.start-icon {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(243, 239, 230, 0.25);
+  margin-bottom: 4px;
+}
+
+.start-icon img { width: 32px; height: 32px; }
+
+.start h1 {
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+.start p {
+  opacity: 0.72;
+  font-size: 14.5px;
+  line-height: 1.5;
+  max-width: 32ch;
+}
+
+.start .fineprint { font-size: 12.5px; opacity: 0.42; margin-top: 2px; }
+
+.primary {
+  margin-top: 6px;
+  padding: 13px 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(243, 239, 230, 0.32);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.primary:hover:not(:disabled) {
+  background: rgba(243, 239, 230, 0.1);
+  border-color: rgba(243, 239, 230, 0.55);
+}
+
+.primary:disabled { opacity: 0.55; cursor: default; }
+.primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.error { color: #f0a5a5; font-size: 13.5px; max-width: 36ch; }
+
+/* ---------- wand switcher (top) ---------- */
+
+.wands {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 999px;
+  background: rgba(11, 15, 12, 0.5);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(243, 239, 230, 0.12);
+  z-index: 3;
+}
+
+.wand {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  text-decoration: none;
+  opacity: 0.5;
+  transition: opacity 160ms ease, border-color 160ms ease, background 160ms ease;
+  --wand-accent: #f3efe6;
+}
+
+.wand img {
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+}
+
+.wand:hover { opacity: 0.85; }
+
+.wand.active {
+  opacity: 1;
+  border-color: var(--wand-accent);
+  background: color-mix(in srgb, var(--wand-accent) 16%, transparent);
+}
+
+.wand:focus-visible { outline: 2px solid var(--wand-accent); outline-offset: 2px; }
+
+/* ---------- hint line ---------- */
+
+.hud {
+  position: absolute;
+  left: 50%;
+  bottom: calc(150px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: rgba(11, 15, 12, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(243, 239, 230, 0.12);
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ---------- camera bar (bottom) ---------- */
+
+.camera-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 0 calc(20px + env(safe-area-inset-bottom));
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  z-index: 3;
+  background: linear-gradient(to top, rgba(8, 10, 9, 0.55), transparent);
+}
+
+.modes {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(11, 15, 12, 0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.modes button {
+  padding: 6px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(243, 239, 230, 0.6);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.modes button.on {
+  color: #0b0f0c;
+  background: var(--accent);
+}
+
+.modes button:disabled { opacity: 0.4; cursor: default; }
+.modes button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Apple-style shutter: outer ring, inner shape morphs to a stop square. */
+.shutter {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 3px solid rgba(243, 239, 230, 0.9);
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.shutter .inner {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #f3efe6;
+  transition: width 180ms ease, height 180ms ease, border-radius 180ms ease,
+    background 180ms ease;
+}
+
+.shutter.video .inner { background: #ff4b4b; }
+
+.shutter.recording .inner {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: #ff4b4b;
+}
+
+.shutter:active .inner { opacity: 0.7; }
+.shutter:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+/* ---------- recording indicator ---------- */
+
+.rec {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top));
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: rgba(11, 15, 12, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  z-index: 3;
+}
+
+.rec .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ff4b4b;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% { opacity: 0.25; }
+}
+
+/* ---------- spell cast toast ---------- */
+
+.toast {
+  position: absolute;
+  left: 50%;
+  top: 96px;
+  transform: translateX(-50%);
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(11, 15, 12, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--accent);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  z-index: 3;
+  animation: rise 240ms ease;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+}
+
+/* ---------- shutter flash ---------- */
+
+.flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  z-index: 5;
+  pointer-events: none;
+  animation: flash 180ms ease-out;
+}
+
+@keyframes flash {
+  from { opacity: 0.85; }
+  to { opacity: 0; }
+}
+
+/* ---------- small screens ---------- */
+
+@media (max-width: 480px) {
+  .wand { width: 42px; height: 42px; }
+  .wand img { width: 21px; height: 21px; }
+  .wands { gap: 7px; padding: 6px; }
+  .hud {
+    font-size: 12px;
+    padding: 8px 14px;
+    max-width: calc(100vw - 32px);
+    white-space: normal;
+    text-align: center;
+  }
+  .shutter { width: 64px; height: 64px; }
+  .shutter .inner { width: 51px; height: 51px; }
+  .start h1 { font-size: 26px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rec .dot { animation: none; }
+  .toast { animation: none; }
+  .flash { animation-duration: 60ms; }
+  .shutter .inner { transition: none; }
+}
