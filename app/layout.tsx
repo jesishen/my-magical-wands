@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/react";
 import type { Metadata, Viewport } from "next";
 import StageMount from "@/components/StageMount";
 import "./globals.css";
@@ -18,9 +19,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        {/* Lives in the layout so switching wands never restarts the camera. */}
         <StageMount />
         {children}
+        <Analytics />
       </body>
     </html>
   );
