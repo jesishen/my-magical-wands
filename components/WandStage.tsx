@@ -120,6 +120,9 @@ export default function WandStage() {
     const video = videoRef.current;
     if (!video) return;
 
+    const old = video.srcObject as MediaStream | null;
+    old?.getTracks().forEach((t) => t.stop());
+
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: "user",
