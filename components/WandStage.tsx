@@ -62,6 +62,8 @@ export default function WandStage() {
   const stagePoseRef = useRef<{ n: number; frames: number }>({ n: 0, frames: 0 });
   const fistFramesRef = useRef(0);
   const lastCatchRef = useRef(0);
+  /** 0–1 ramp for the constellation glow — rises while a fist is held. */
+  const litRef = useRef(0);
   const landmarkerRef = useRef<HandLandmarker | null>(null);
   const themeRef = useRef<Theme>(theme);
   const rafRef = useRef(0);
@@ -152,7 +154,19 @@ export default function WandStage() {
         dwellRef.current = null;
         tracerRef.current.clear();
         tipRef.current = null;
+        litRef.current = 0; // next constellation starts unlit
       } else if (!anyOpen) {
+        // --- fist: light the constellation
+        // Stars are placed unlit. Holding a fist ramps the glow up over ~0.6s
+        // and it stays lit; opening the hand releases them entirely.
+        // Only light stars that are still planted — not ones mid-flight.
+        // Otherwise a fist during the release re-lights the departing stars.
+        if (th.litByFist && hands.some(isFist)) {
+          const anyPlanted = gardenRef.current.some((p) => p.state === "planted");
+          if (anyPlanted) {
+            litRef.current = Math.min(1, litRef.current + 0.035);
+          }
+        }
         // --- fist: catch nearby creatures in an orb
         if (th.catchable && hands.length > 0) {
           const fist = hands.some(isFist);
@@ -298,7 +312,7 @@ export default function WandStage() {
     }
 
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-    step(gardenRef.current, ctx, t, th, tipRef.current);
+    step(gardenRef.current, ctx, t, th, tipRef.current, litRef.current);
     if (catchersRef.current.length > 0) {
       catchersRef.current = stepCatchers(
         catchersRef.current,
@@ -362,6 +376,7 @@ export default function WandStage() {
         artRef.current = imgs;
         gardenRef.current = [];
         catchersRef.current = [];
+        litRef.current = 0;
         lastPointsRef.current = [null, null];
         smoothRef.current = [null, null];
         dwellRef.current = null;
@@ -501,11 +516,17 @@ export default function WandStage() {
       {!running && (
         <div className="start">
           <div className="start-icon" aria-hidden>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={theme.icon} alt="" />
+            <svg viewBox="0 0 24 24" width="32" height="32">
+              <path
+                d="M12 1.5 L13.9 9.4 L21.5 12 L13.9 14.6 L12 22.5 L10.1 14.6 L2.5 12 L10.1 9.4 Z"
+                fill="currentColor"
+              />
+              <circle cx="19.6" cy="4.8" r="1.5" fill="currentColor" />
+              <circle cx="4.6" cy="18.8" r="1.1" fill="currentColor" />
+            </svg>
           </div>
-          <h1>{theme.label}</h1>
-          <p>{theme.hint}</p>
+          <h1>Magical Wands</h1>
+          <p>Your current abilities:</p> <p>Draw Flowers and Create Constellations.</p>
           {error && <p className="error">{error}</p>}
           <button className="primary" onClick={start} disabled={status !== ""}>
             {status || "Start camera"}

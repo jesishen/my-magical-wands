@@ -40,9 +40,16 @@ export type Theme = {
   evolves: boolean;
   /** A closed fist catches nearby creatures in an orb. */
   catchable: boolean;
+  /** A closed fist lights the scene: halos fade in and twinkling begins. */
+  litByFist: boolean;
+  /** Soft halo behind each particle once lit. */
+  glowHalo: boolean;
+  glowColor: string;
+  /** Halo diameter as a multiple of the particle size. */
+  glowSize: number;
 
   /** What an open palm does. */
-  burstStyle: "explode" | "driftUp" | "levitate";
+  burstStyle: "explode" | "driftUp" | "levitate" | "shoot";
   gravity: number;
   drag: number;
   fade: number;
@@ -50,11 +57,11 @@ export type Theme = {
   maxParticles: number;
 };
 
-export const THEMES: Record<ThemeKey, Theme> = {
+export const THEMES: Partial<Record<ThemeKey, Theme>> = {
   flowers: {
     key: "flowers",
     label: "Flowers",
-    icon: "/icons/flowers.svg",
+    icon: "/icons/flowers.webp",
     path: "/",
     hint: "Point to plant · Open your hand to scatter",
     accent: "#f0b4c4",
@@ -63,8 +70,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
     follow: 1,
     spacing: 14,
     dwellMs: 0,
-    sizeMin: 34,
-    sizeMax: 80,
+    sizeMin: 22,
+    sizeMax: 54,
     breatheAmount: 0.09,
     wander: 0,
     twinkle: 0,
@@ -79,14 +86,18 @@ export const THEMES: Record<ThemeKey, Theme> = {
     drag: 0.985,
     fade: 0.012,
     maxParticles: 500,
+    litByFist: false,
+    glowHalo: false,
+    glowColor: "#ffffff",
+    glowSize: 2.4,
   },
 
   stars: {
     key: "stars",
     label: "Constellations",
-    icon: "/icons/stars.svg",
+    icon: "/icons/stars.webp",
     path: "/stars",
-    hint: "Hold still to place a star · Open your hand to release",
+    hint: "Point to place a star · Close your fist to light them · Open your hand and make a wish!",
     accent: "#cfe0ff",
     manifest: "/art/stars/manifest.json",
     plantMode: "dwell",
@@ -104,13 +115,18 @@ export const THEMES: Record<ThemeKey, Theme> = {
     squash: 0,
     evolves: false,
     catchable: false,
-    burstStyle: "driftUp",
-    gravity: -0.012,
-    drag: 0.995,
-    fade: 0.005,
+    burstStyle: "shoot",
+    gravity: 0.045, // gentler arc for a slower star
+    drag: 1,
+    fade: 0.003,
     maxParticles: 220,
+    litByFist: true,
+    glowHalo: true,
+    glowColor: "#fff3c4", // soft warm white-yellow
+    glowSize: 3.1,
   },
 
+    /* Hidden until the art is ready — uncomment to bring back.
   spells: {
     key: "spells",
     label: "Spells",
@@ -146,7 +162,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
     label: "Creatures",
     icon: "/icons/creatures.svg",
     path: "/creatures",
-    hint: "1 finger to summon · 2 or 3 to evolve · Fist to catch · Open hand to release",    accent: "#f6c98a",
+    hint: "1 finger to summon · 2 or 3 to evolve · Fist to catch · Open hand to release",
+    accent: "#f6c98a",
     manifest: "/art/creatures/manifest.json",
     plantMode: "trail",
     follow: 0.55,
@@ -169,10 +186,14 @@ export const THEMES: Record<ThemeKey, Theme> = {
     fade: 0.009,
     maxParticles: 40,
   },
+*/
+
 };
 
-export const THEME_LIST = Object.values(THEMES);
+export const THEME_LIST = Object.values(THEMES).filter(
+  (t): t is Theme => t !== undefined
+);
 
 export function themeFromPath(pathname: string): Theme {
-  return THEME_LIST.find((t) => t.path === pathname) ?? THEMES.flowers;
+  return THEME_LIST.find((t) => t.path === pathname) ?? THEME_LIST[0];
 }

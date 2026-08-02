@@ -1,8 +1,0 @@
-Put your full-size stars drawings in this folder (PNG, any size).
-
-Then run:  npm run compress stars
-
-That resizes to 256px, converts to WebP, writes into public/art/stars/,
-and regenerates the manifest automatically.
-
-Do not edit public/art/stars/ by hand — it gets overwritten.

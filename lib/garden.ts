@@ -26,6 +26,12 @@ export type Particle = {
   family: HTMLImageElement[] | null;
   stage: number; // 0-indexed into family
   caught: boolean; // hidden while being sucked into an orb
+  /** Per-particle multiplier on the twinkle period, so no two pulse alike. */
+  rate: number;
+  /** Recent positions, for drawing a streak behind a shooting star. */
+  trail: { x: number; y: number }[];
+  /** ms to wait before launching, so they leave in a stream. */
+  delay: number;
 };
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -35,6 +41,48 @@ const easeOutBack = (x: number) =>
 
 const GROW_MS = 260;
 const BREATHE_MS = 620;
+/** How many past positions make up a shooting star's streak. */
+const TRAIL_LEN = 26;
+
+/**
+ * A soft radial halo, rendered once to an offscreen canvas and then stamped
+ * per particle. Building a gradient per star per frame would be far too slow
+ * with a few hundred on screen.
+ */
+let glowSprite: HTMLCanvasElement | null = null;
+let glowSpriteColor = "";
+
+function getGlowSprite(color: string): HTMLCanvasElement {
+  if (glowSprite && glowSpriteColor === color) return glowSprite;
+
+  const size = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const g = c.getContext("2d")!;
+
+  const grad = g.createRadialGradient(
+    size / 2, size / 2, 0,
+    size / 2, size / 2, size / 2
+  );
+  // Hot core fading to nothing — the falloff is what reads as "glow".
+  grad.addColorStop(0, color);
+  grad.addColorStop(0.22, color);
+  grad.addColorStop(0.55, hexToRgba(color, 0.28));
+  grad.addColorStop(1, hexToRgba(color, 0));
+
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+
+  glowSprite = c;
+  glowSpriteColor = color;
+  return c;
+}
+
+function hexToRgba(hex: string, a: number): string {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
 
 /** Shuffled bag: every image appears once before any repeats. */
 let bag: number[] = [];
@@ -102,6 +150,9 @@ function spawn(
     family,
     stage: 0,
     caught: false,
+    rate: rand(0.55, 1.7),
+    trail: [],
+    delay: 0,
   });
 
   if (garden.length > theme.maxParticles) garden.shift();
@@ -171,7 +222,15 @@ export function burst(
     if (p.state === "burst") continue;
     p.state = "burst";
 
-    if (theme.burstStyle === "driftUp") {
+    if (theme.burstStyle === "shoot") {
+      // Fast to the right and slightly upward; gravity bends it into an arc.
+      p.vx = rand(5, 8);
+      p.vy = rand(-4, -2.4);
+      p.spin = 0;
+      p.trail = [];
+      p.delay = 0; // all at once
+      p.born = performance.now();
+    } else if (theme.burstStyle === "driftUp") {
       p.vx = rand(-0.5, 0.5);
       p.vy = rand(-1.6, -0.6);
       p.spin = rand(-0.01, 0.01);
@@ -386,7 +445,12 @@ export function step(
   ctx: CanvasRenderingContext2D,
   t: number,
   theme: Theme,
-  tip: { x: number; y: number } | null
+  tip: { x: number; y: number } | null,
+  /**
+   * 0–1. Stars are placed unlit; closing a fist ramps this to 1 and the
+   * constellation lights up. Nothing glows while this is 0.
+   */
+  lit = 0
 ) {
   // Constellation lines first, so they sit behind the art.
   if (theme.link) {
@@ -415,6 +479,7 @@ export function step(
     let alpha = p.alpha;
     let sx = 1;
     let sy = 1;
+    let glowK = 0; // 0–1 halo brightness for this frame
 
     if (p.state === "planted") {
       const grow = Math.min(1, (t - p.born) / GROW_MS);
@@ -452,8 +517,34 @@ export function step(
         p.y = p.homeY + Math.cos(t / 1900 + p.phase * 1.7) * theme.wander * 4;
       }
 
-      if (theme.twinkle > 0) {
-        alpha = 1 - theme.twinkle * (0.5 + 0.5 * Math.sin(t / 380 + p.phase));
+      // Unlit stars sit steady. Once lit, each pulses at its own rate.
+      if (theme.twinkle > 0 && lit > 0.01) {
+        const wave = 0.5 + 0.5 * Math.sin((t / 380) * p.rate + p.phase);
+        alpha = 1 - theme.twinkle * wave * lit;
+        glowK = (0.35 + 0.65 * (1 - wave)) * lit;
+      }
+    } else if (theme.burstStyle === "shoot") {
+      // Hold position until this star's turn, so they leave in a stream.
+      const waited = t - p.born;
+      if (waited < p.delay) {
+        glowK = lit;
+      } else {
+        p.trail.push({ x: p.x, y: p.y });
+        if (p.trail.length > TRAIL_LEN) p.trail.shift();
+
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += theme.gravity; // positive gravity bends the arc back down
+        p.rot = Math.atan2(p.vy, p.vx);
+        p.alpha -= theme.fade;
+        alpha = p.alpha;
+        glowK = p.alpha;
+
+        // Gone once it clears the right edge or fades out.
+        if (p.alpha <= 0 || p.x - p.size > ctx.canvas.width) {
+          garden.splice(i, 1);
+          continue;
+        }
       }
     } else {
       p.x += p.vx;
@@ -468,6 +559,7 @@ export function step(
         theme.burstStyle === "explode"
           ? 1 + (1 - p.alpha) * 0.5 // blooms outward
           : 1 - (1 - p.alpha) * 0.4; // shrinks into the sky
+          if (theme.twinkle > 0) glowK = p.alpha * 0.6 * lit; // halo fades out with it
       if (p.alpha <= 0) {
         garden.splice(i, 1);
         continue;
@@ -475,6 +567,36 @@ export function step(
     }
 
     const s = p.size * scale * (p.family ? stageScale(p.stage) : 1);
+
+    // Streak behind a shooting star: tapered, brightest nearest the head.
+    if (p.trail.length > 1) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.lineCap = "round";
+      for (let k = 1; k < p.trail.length; k++) {
+        const f = k / p.trail.length; // 0 at the tail, 1 at the head
+        ctx.globalAlpha = f * 0.55 * alpha;
+        ctx.strokeStyle = theme.glowColor;
+        ctx.lineWidth = s * 0.22 * f;
+        ctx.beginPath();
+        ctx.moveTo(p.trail[k - 1].x, p.trail[k - 1].y);
+        ctx.lineTo(p.trail[k].x, p.trail[k].y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Halo first, so the art sits on top of its own light.
+    if (theme.glowHalo && glowK > 0.01) {
+      const sprite = getGlowSprite(theme.glowColor);
+      const gs = s * theme.glowSize;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, glowK * 0.9) * Math.max(0, Math.min(1, alpha));
+      ctx.globalCompositeOperation = "lighter";
+      ctx.drawImage(sprite, p.x - gs / 2, p.y - gs / 2, gs, gs);
+      ctx.restore();
+    }
+
     ctx.save();
     ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
     ctx.translate(p.x, p.y);

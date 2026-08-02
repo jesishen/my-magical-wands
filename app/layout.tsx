@@ -3,14 +3,8 @@ import StageMount from "@/components/StageMount";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Magical Wand",
-  description:
-    "Your finger is a wand. Draw in the air with your camera — flowers, constellations, spells, creatures.",
-  openGraph: {
-    title: "Magical Wand",
-    description: "Your finger is a wand. Draw in the air with your camera.",
-    type: "website",
-  },
+  title: "Magical Wands",
+  description: "Your current abilities: Drawing Flowers or Creating Constellations",
 };
 
 export const viewport: Viewport = {
