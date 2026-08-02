@@ -120,20 +120,11 @@ export default function WandStage() {
     const video = videoRef.current;
     if (!video) return;
 
-    // Drop the old stream first, or the camera stays locked to its old shape.
-    const old = video.srcObject as MediaStream | null;
-    old?.getTracks().forEach((t) => t.stop());
-
-    const portrait = window.innerHeight > window.innerWidth;
-    const long = 1280;
-    const short = 720;
-
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: "user",
         aspectRatio: { ideal: window.innerWidth / window.innerHeight },
-        width: { ideal: portrait ? short : long },
-        height: { ideal: portrait ? long : short },
+        width: { ideal: 1280 }, // hint at quality; the ratio drives the shape
       },
       audio: false,
     });
@@ -154,7 +145,7 @@ export default function WandStage() {
       screenRatio / videoRatio
     );
 
-    const fit = mismatch > 1.35 ? "contain" : "cover";
+    const fit = "cover" as const;
     fitRef.current = fit;
     video.style.objectFit = fit;
   }, []);
