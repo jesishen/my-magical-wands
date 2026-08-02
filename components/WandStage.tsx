@@ -526,13 +526,14 @@ export default function WandStage() {
             </svg>
           </div>
           <h1>Magical Wands</h1>
-          <p>Your current abilities:</p> <p>Draw Flowers and Create Constellations.</p>
+          <h4>Your current abilities:</h4> <p>Draw Flowers and Create Constellations.</p>
+          <h4>Your upcoming abilities:</h4> <p>Spawning and Catching Pokemon! (In the works...)</p>
           {error && <p className="error">{error}</p>}
           <button className="primary" onClick={start} disabled={status !== ""}>
             {status || "Start camera"}
           </button>
           <p className="fineprint">
-            Runs entirely on your device. Nothing is uploaded.
+            Just added the capture and recording feature for y'all!
           </p>
         </div>
       )}
