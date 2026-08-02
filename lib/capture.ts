@@ -1,25 +1,24 @@
 /**
  * Photo + video capture.
- *
- * Both composite the mirrored camera feed and the particle canvas into a
- * single offscreen canvas, so what you save matches what you saw.
  */
 
 type Sources = {
   video: HTMLVideoElement;
   canvas: HTMLCanvasElement;
+  fit?: "cover" | "contain";
 };
 
 /** Draw one composited frame into ctx at the given CSS size. */
 function composite(
   ctx: CanvasRenderingContext2D,
-  { video, canvas }: Sources,
+  { video, canvas, fit = "cover" }: Sources,
   w: number,
   h: number
 ) {
   const vw = video.videoWidth || w;
   const vh = video.videoHeight || h;
-  const scale = Math.max(w / vw, h / vh);
+  const scale =
+    fit === "contain" ? Math.min(w / vw, h / vh) : Math.max(w / vw, h / vh);
   const dw = vw * scale;
   const dh = vh * scale;
 

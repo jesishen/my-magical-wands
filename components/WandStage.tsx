@@ -80,6 +80,7 @@ export default function WandStage() {
   const lastThrowRef = useRef(0);
   const recorderRef = useRef(new Recorder());
   const skeletonRef = useRef(true);
+  const fitRef = useRef<"cover" | "contain">("cover");
 
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState("");
@@ -102,7 +103,10 @@ export default function WandStage() {
     const vw = video.videoWidth || cw;
     const vh = video.videoHeight || ch;
 
-    const scale = Math.max(cw / vw, ch / vh);
+    const scale =
+      fitRef.current === "contain"
+        ? Math.min(cw / vw, ch / vh)
+        : Math.max(cw / vw, ch / vh);
     const dw = vw * scale;
     const dh = vh * scale;
 
@@ -110,6 +114,23 @@ export default function WandStage() {
       x: (cw - dw) / 2 + (1 - nx) * dw, // 1 - nx mirrors to match the video
       y: (ch - dh) / 2 + ny * dh,
     };
+  }, []);
+
+  const updateFit = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || !video.videoWidth) return;
+
+    const screenRatio = canvas.clientWidth / canvas.clientHeight;
+    const videoRatio = video.videoWidth / video.videoHeight;
+    const mismatch = Math.max(
+      videoRatio / screenRatio,
+      screenRatio / videoRatio
+    );
+
+    const fit = mismatch > 1.35 ? "contain" : "cover";
+    fitRef.current = fit;
+    video.style.objectFit = fit;
   }, []);
 
   const resizeCanvas = useCallback(() => {
@@ -405,11 +426,12 @@ export default function WandStage() {
       landmarkerRef.current = await createHandLandmarker();
 
       setStatus("Starting camera…");
+      const portrait = window.innerHeight > window.innerWidth;
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "user",
-          aspectRatio: { ideal: window.innerWidth / window.innerHeight },
-          width: { ideal: 1280 },
+          width: { ideal: portrait ? 720 : 1280 },
+          height: { ideal: portrait ? 1280 : 720 },
         },
         audio: false,
       });
@@ -421,6 +443,7 @@ export default function WandStage() {
       setRunning(true);
       setStatus("");
       resizeCanvas();
+      updateFit();
       rafRef.current = requestAnimationFrame(loop);
     } catch (err) {
       setStatus("");
@@ -432,7 +455,7 @@ export default function WandStage() {
             : "Something went wrong."
       );
     }
-  }, [loop, resizeCanvas]);
+  }, [loop, resizeCanvas, updateFit]);
 
   /** Hide the skeleton for a capture, then restore it. */
   const withSkeletonHidden = useCallback(
@@ -459,7 +482,9 @@ export default function WandStage() {
     setFlash(true);
     setTimeout(() => setFlash(false), 180);
 
-    const blob = await withSkeletonHidden(() => capturePhoto({ video, canvas }));
+    const blob = await withSkeletonHidden(() =>
+      capturePhoto({ video, canvas, fit: fitRef.current })
+    );
     if (blob) await saveOrShare(blob, `${themeRef.current.key}-wand.png`);
   }, [withSkeletonHidden]);
 
@@ -481,7 +506,7 @@ export default function WandStage() {
     } else {
       skeletonRef.current = false; // keep the overlay out of the recording
       setElapsed(0);
-      recorderRef.current.start({ video, canvas });
+      recorderRef.current.start({ video, canvas, fit: fitRef.current });
       setRecording(true);
     }
   }, [showSkeleton]);
@@ -490,17 +515,23 @@ export default function WandStage() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "s") setShowSkeleton((v) => !v);
     };
-    window.addEventListener("resize", resizeCanvas);
+    const onResize = () => {
+      resizeCanvas();
+      updateFit();
+    };
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
     window.addEventListener("keydown", onKey);
     return () => {
-      window.removeEventListener("resize", resizeCanvas);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
       window.removeEventListener("keydown", onKey);
       cancelAnimationFrame(rafRef.current);
       landmarkerRef.current?.close();
       const stream = videoRef.current?.srcObject as MediaStream | null;
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [resizeCanvas]);
+  }, [resizeCanvas, updateFit]);
 
   const mmss = `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(
     elapsed % 60
