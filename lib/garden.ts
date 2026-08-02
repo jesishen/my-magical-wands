@@ -224,8 +224,8 @@ export function burst(
 
     if (theme.burstStyle === "shoot") {
       // Fast to the right and slightly upward; gravity bends it into an arc.
-      p.vx = rand(5, 8);
-      p.vy = rand(-4, -2.4);
+      p.vx = rand(7, 11);
+      p.vy = rand(-5.5, -3.4);
       p.spin = 0;
       p.trail = [];
       p.delay = 0; // all at once
