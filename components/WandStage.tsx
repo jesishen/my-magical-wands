@@ -123,11 +123,12 @@ export default function WandStage() {
     const old = video.srcObject as MediaStream | null;
     old?.getTracks().forEach((t) => t.stop());
 
+    const portrait = window.innerHeight > window.innerWidth;
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: "user",
-        aspectRatio: { ideal: window.innerWidth / window.innerHeight },
-        width: { ideal: 1280 }, // hint at quality; the ratio drives the shape
+        width: { ideal: portrait ? 720 : 1280 },
+        height: { ideal: portrait ? 1280 : 720 },
       },
       audio: false,
     });
