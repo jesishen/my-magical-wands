@@ -116,6 +116,32 @@ export default function WandStage() {
     };
   }, []);
 
+  const openCamera = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Drop the old stream first, or the camera stays locked to its old shape.
+    const old = video.srcObject as MediaStream | null;
+    old?.getTracks().forEach((t) => t.stop());
+
+    const portrait = window.innerHeight > window.innerWidth;
+    const long = 1280;
+    const short = 720;
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "user",
+        aspectRatio: { ideal: window.innerWidth / window.innerHeight },
+        width: { ideal: portrait ? short : long },
+        height: { ideal: portrait ? long : short },
+      },
+      audio: false,
+    });
+
+    video.srcObject = stream;
+    await video.play();
+  }, []);
+
   const updateFit = useCallback(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -426,19 +452,7 @@ export default function WandStage() {
       landmarkerRef.current = await createHandLandmarker();
 
       setStatus("Starting camera…");
-      const portrait = window.innerHeight > window.innerWidth;
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: portrait ? 720 : 1280 },
-          height: { ideal: portrait ? 1280 : 720 },
-        },
-        audio: false,
-      });
-
-      const video = videoRef.current!;
-      video.srcObject = stream;
-      await video.play();
+      await openCamera();
 
       setRunning(true);
       setStatus("");
@@ -455,7 +469,7 @@ export default function WandStage() {
             : "Something went wrong."
       );
     }
-  }, [loop, resizeCanvas, updateFit]);
+  }, [loop, openCamera, resizeCanvas, updateFit]);
 
   /** Hide the skeleton for a capture, then restore it. */
   const withSkeletonHidden = useCallback(
@@ -515,9 +529,19 @@ export default function WandStage() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "s") setShowSkeleton((v) => !v);
     };
+    let wasPortrait = window.innerHeight > window.innerWidth;
+
     const onResize = () => {
       resizeCanvas();
-      updateFit();
+      const nowPortrait = window.innerHeight > window.innerWidth;
+      if (nowPortrait !== wasPortrait && videoRef.current?.srcObject) {
+        wasPortrait = nowPortrait;
+        openCamera()
+          .then(updateFit)
+          .catch(() => updateFit());
+      } else {
+        updateFit();
+      }
     };
     window.addEventListener("resize", onResize);
     window.addEventListener("orientationchange", onResize);
@@ -531,7 +555,7 @@ export default function WandStage() {
       const stream = videoRef.current?.srcObject as MediaStream | null;
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [resizeCanvas, updateFit]);
+  }, [openCamera, resizeCanvas, updateFit]);
 
   const mmss = `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(
     elapsed % 60
@@ -539,7 +563,12 @@ export default function WandStage() {
 
   return (
     <main className="stage" style={{ ["--accent" as string]: theme.accent }}>
-      <video ref={videoRef} playsInline muted />
+      <video
+        ref={videoRef}
+        playsInline
+        muted
+        onLoadedMetadata={updateFit}
+      />
       <canvas ref={canvasRef} />
 
       {flash && <div className="flash" aria-hidden />}
