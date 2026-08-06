@@ -11,11 +11,15 @@ import {
   place,
   plant,
   resetBag,
+  drawHeldBall,
+  frameDelta,
+  newCatch,
   setStage,
-  startCatch,
   step,
-  stepCatchers,
-  type Catcher,
+  stepCatch,
+  summon,
+  tryCatch,
+  type Catch,
   type Particle,
 } from "@/lib/garden";
 import {
@@ -30,6 +34,16 @@ import {
   WRIST,
 } from "@/lib/hands";
 import { loadImages, loadOne, type ArtSet } from "@/lib/loadImages";
+import {
+  addToDex,
+  buildCatalog,
+  dexNumber,
+  dexTotal,
+  dexUnique,
+  speciesName,
+  type Dex,
+  type Entry,
+} from "@/lib/dex";
 import { THEME_LIST, themeFromPath, type Theme } from "@/lib/themes";
 import { ShapeTracer } from "@/lib/shapes";
 import { capturePhoto, Recorder, saveOrShare } from "@/lib/capture";
@@ -43,7 +57,11 @@ const THROW_RATE = 0.055;
 /** Frames a stage pose must hold before evolving — stops flicker on transitions. */
 const EVOLVE_FRAMES = 3;
 const FIST_FRAMES = 4;
-const CATCH_COOLDOWN_MS = 1400;
+const CATCH_COOLDOWN_MS = 900;
+/** Frames a summon pose must hold before it fires. */
+const SUMMON_FRAMES = 5;
+/** Don't let one held pose spray creatures. */
+const SUMMON_COOLDOWN_MS = 900;
 
 type Point = { x: number; y: number };
 type Mode = "photo" | "video";
@@ -57,12 +75,17 @@ export default function WandStage() {
 
   const gardenRef = useRef<Particle[]>([]);
   const artRef = useRef<ArtSet>({ images: [], families: [] });
-  const orbRef = useRef<HTMLImageElement | null>(null);
-  const catchersRef = useRef<Catcher[]>([]);
+  const ballRef = useRef<HTMLImageElement | null>(null);
+  const ballOpenRef = useRef<HTMLImageElement | null>(null);
+  /** Star art borrowed from the constellation wand, for the catch burst. */
+  const starsRef = useRef<HTMLImageElement[]>([]);
+  const catchesRef = useRef<Catch[]>([]);
+  /** Ball resting in an open hand: where it is and when it appeared. */
+  const heldRef = useRef<{ x: number; y: number; born: number } | null>(null);
   const stagePoseRef = useRef<{ n: number; frames: number }>({ n: 0, frames: 0 });
   const fistFramesRef = useRef(0);
   const lastCatchRef = useRef(0);
-  /** 0–1 ramp for the constellation glow — rises while a fist is held. */
+  const lastSummonRef = useRef(0);
   const litRef = useRef(0);
   const landmarkerRef = useRef<HandLandmarker | null>(null);
   const themeRef = useRef<Theme>(theme);
@@ -91,6 +114,10 @@ export default function WandStage() {
   const [elapsed, setElapsed] = useState(0);
   const [flash, setFlash] = useState(false);
   const [toast, setToast] = useState("");
+  const [dex, setDex] = useState<Dex>({});
+  const [showDex, setShowDex] = useState(false);
+  /** Every catchable species, built from the art once it's loaded. */
+  const [catalog, setCatalog] = useState<Entry[]>([]);
 
   skeletonRef.current = showSkeleton;
 
@@ -123,13 +150,16 @@ export default function WandStage() {
     const old = video.srcObject as MediaStream | null;
     old?.getTracks().forEach((t) => t.stop());
 
-    const screenRatio = window.innerWidth / window.innerHeight;
+    // No aspectRatio here. iOS satisfies that constraint by digitally cropping
+    // the sensor, which is what made the picture look zoomed way in. Ask only
+    // for a resolution and let the camera give its native, uncropped frame —
+    // object-fit: cover then trims the edges, keeping ~82% of it.
+    const portrait = window.innerHeight > window.innerWidth;
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: "user",
-        aspectRatio: { ideal: screenRatio },
-        width: { ideal: 1280 },
-        height: { ideal: 1280 },
+        width: { ideal: portrait ? 720 : 1280 },
+        height: { ideal: portrait ? 1280 : 720 },
       },
       audio: false,
     });
@@ -187,7 +217,71 @@ export default function WandStage() {
       openFramesRef.current = anyOpen ? openFramesRef.current + 1 : 0;
       const cooling = t - lastBurstRef.current < BURST_COOLDOWN_MS;
 
-      if (openFramesRef.current >= BURST_FRAMES && !cooling) {
+      if (th.summonMode === "summon") {
+        // ---- Pokémon-style loop: summon by finger count, catch with a ball.
+        const hand = hands[0];
+
+        if (hand && isOpenHand(hand)) {
+          // Ball rests in the open palm and tracks it.
+          const at = toScreen(hand[9].x, hand[9].y);
+          if (heldRef.current) {
+            heldRef.current.x = at.x;
+            heldRef.current.y = at.y;
+          } else {
+            heldRef.current = { x: at.x, y: at.y, born: t };
+          }
+        } else if (hand && isFist(hand) && heldRef.current) {
+          // Fist closes over the ball — catch whatever it's covering.
+          const { x, y } = heldRef.current;
+          if (t - lastCatchRef.current > CATCH_COOLDOWN_MS) {
+            const got = tryCatch(gardenRef.current, x, y);
+            lastCatchRef.current = t;
+            heldRef.current = null;
+            if (got) {
+              catchesRef.current.push(newCatch(x, y));
+              const name = speciesName(got.familyName, got.stage);
+              setDex((d) => addToDex(d, name));
+              setToast(`caught ${name}!`);
+            } else {
+              setToast("so close…");
+            }
+          }
+        } else if (hand && !isOpenHand(hand)) {
+          // Holding up N fingers summons one at stage N.
+          const n = extendedCount(hand);
+          const pose = stagePoseRef.current;
+          if (n === pose.n) pose.frames++;
+          else {
+            pose.n = n;
+            pose.frames = 1;
+          }
+          if (
+            n >= 1 &&
+            n <= 3 &&
+            pose.frames === SUMMON_FRAMES &&
+            t - lastSummonRef.current > SUMMON_COOLDOWN_MS
+          ) {
+            const p = summon(
+              gardenRef.current,
+              n - 1,
+              canvas.clientWidth,
+              canvas.clientHeight,
+              artRef.current.images,
+              th,
+              artRef.current.families
+            );
+            if (p) {
+              lastSummonRef.current = t;
+              setToast(n === 1 ? "a wild one appeared!" : `stage ${n}!`);
+            }
+          }
+        }
+
+        if (!hand) {
+          heldRef.current = null;
+          stagePoseRef.current = { n: 0, frames: 0 };
+        }
+      } else if (openFramesRef.current >= BURST_FRAMES && !cooling) {
         const open = hands.find(isOpenHand)!;
         const origin = toScreen(open[WRIST].x, open[WRIST].y);
         burst(gardenRef.current, origin.x, origin.y, th);
@@ -210,41 +304,7 @@ export default function WandStage() {
             litRef.current = Math.min(1, litRef.current + 0.035);
           }
         }
-        // --- fist: catch nearby creatures in an orb
-        if (th.catchable && hands.length > 0) {
-          const fist = hands.some(isFist);
-          fistFramesRef.current = fist ? fistFramesRef.current + 1 : 0;
-          if (
-            fistFramesRef.current === FIST_FRAMES &&
-            t - lastCatchRef.current > CATCH_COOLDOWN_MS
-          ) {
-            const hand = hands.find(isFist)!;
-            const at = toScreen(hand[9].x, hand[9].y);
-            const c = startCatch(gardenRef.current, at.x, at.y);
-            if (c) {
-              catchersRef.current.push(c);
-              lastCatchRef.current = t;
-              setToast("caught!");
-            }
-          }
-        }
 
-        // --- 1 / 2 / 3 fingers: evolution stage
-        if (th.evolves && hands.length > 0) {
-          const n = extendedCount(hands[0]);
-          const pose = stagePoseRef.current;
-          if (n === pose.n) pose.frames++;
-          else {
-            pose.n = n;
-            pose.frames = 1;
-          }
-          // 1 finger is the drawing pose, so only 2 and 3 evolve.
-          if ((n === 2 || n === 3) && pose.frames === EVOLVE_FRAMES) {
-            if (setStage(gardenRef.current, n - 1)) {
-              setToast(n === 3 ? "final form" : "evolved");
-            }
-          }
-        }
         // Throw: hand growing quickly means it's moving toward the camera.
         if (th.chase > 0 && hands.length > 0) {
           const span = handSpan(hands[0]);
@@ -356,14 +416,31 @@ export default function WandStage() {
 
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     step(gardenRef.current, ctx, t, th, tipRef.current, litRef.current);
-    if (catchersRef.current.length > 0) {
-      catchersRef.current = stepCatchers(
-        catchersRef.current,
-        gardenRef.current,
+    if (heldRef.current) {
+      const held = heldRef.current;
+      drawHeldBall(
         ctx,
-        t,
-        orbRef.current,
-        th.accent
+        held.x,
+        held.y,
+        ballOpenRef.current ?? ballRef.current,
+        th.accent,
+        (t - held.born) / 220
+      );
+    }
+
+    if (catchesRef.current.length > 0) {
+      const d = frameDelta();
+      catchesRef.current = catchesRef.current.filter((c) =>
+        stepCatch(
+          c,
+          gardenRef.current,
+          ctx,
+          t,
+          ballRef.current,
+          th.accent,
+          starsRef.current,
+          d
+        )
       );
     }
 
@@ -417,8 +494,12 @@ export default function WandStage() {
       .then((imgs) => {
         if (cancelled) return;
         artRef.current = imgs;
+        if (theme.summonMode === "summon") {
+          setCatalog(buildCatalog(imgs.families));
+        }
         gardenRef.current = [];
-        catchersRef.current = [];
+        catchesRef.current = [];
+        heldRef.current = null;
         litRef.current = 0;
         lastPointsRef.current = [null, null];
         smoothRef.current = [null, null];
@@ -438,12 +519,20 @@ export default function WandStage() {
     try {
       setStatus("Loading art…");
       artRef.current = await loadImages(themeRef.current.manifest);
-      if (artRef.current.images.length === 0) {
-        throw new Error("No art found for this wand.");
+      if (themeRef.current.summonMode === "summon") {
+        setCatalog(buildCatalog(artRef.current.families));
       }
 
-      // Optional — falls back to a drawn orb if the file isn't there.
-      orbRef.current = await loadOne("/catch/orb.webp");
+      // Both optional — a drawn fallback ball is used if either is missing.
+      ballRef.current = await loadOne("/catch/ball.webp");
+      ballOpenRef.current = await loadOne("/catch/ball-open.webp");
+
+      // Reuse the constellation art for the catch sparkle.
+      try {
+        starsRef.current = (await loadImages("/art/stars/manifest.json")).images;
+      } catch {
+        starsRef.current = [];
+      }
       setStatus("Loading hand tracking…");
       landmarkerRef.current = await createHandLandmarker();
 
@@ -582,8 +671,8 @@ export default function WandStage() {
             </svg>
           </div>
           <h1>Magical Wands</h1>
-          <h4>Your current abilities:</h4> <p>Draw Flowers and Create Constellations.</p>
-          <h4>Your upcoming abilities:</h4> <p>Spawning and Catching Pokemon! (In the works...)</p>
+          <h4>Your current abilities:</h4> <p>Draw Flowers, Create Constellations, Spawn and Catch Pokemon!</p>
+          <h4>Your upcoming abilities:</h4> <p>I'm trying to do something to do with Harry Potter...</p>
           {error && <p className="error">{error}</p>}
           <button className="primary" onClick={start} disabled={status !== ""}>
             {status || "Start camera"}
@@ -612,6 +701,66 @@ export default function WandStage() {
               </Link>
             ))}
           </nav>
+
+          {theme.summonMode === "summon" && (
+            <button
+              className="dex-badge"
+              onClick={() => setShowDex(true)}
+              aria-label="View your collection"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/catch/ball.webp" alt="" />
+              <span>{dexTotal(dex)}</span>
+            </button>
+          )}
+
+          {showDex && (
+            <div
+              className="dex-sheet"
+              role="dialog"
+              aria-label="Your collection"
+              onClick={() => setShowDex(false)}
+            >
+              <div className="dex-panel" onClick={(e) => e.stopPropagation()}>
+                <header>
+                  <h2>Your collection</h2>
+                  <p>
+                    {dexUnique(dex)} of {catalog.length} found ·{" "}
+                    {dexTotal(dex)} caught
+                  </p>
+                </header>
+
+                <ul className="dex-grid">
+                  {catalog.map((entry, i) => {
+                    const n = dex[entry.name] ?? 0;
+                    return (
+                      <li
+                        key={entry.name}
+                        className={n > 0 ? "dex-cell found" : "dex-cell"}
+                      >
+                        <div className="dex-art">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={entry.src} alt="" />
+                          {n > 1 && <span className="dex-x">×{n}</span>}
+                        </div>
+                        <span className="dex-num">{dexNumber(i)}</span>
+                        <span className="dex-name">
+                          {n > 0 ? entry.name : "???"}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                <button
+                  className="primary dex-close"
+                  onClick={() => setShowDex(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
 
           {recording && (
             <div className="rec">

@@ -1,8 +1,0 @@
-Put your full-size creatures drawings in this folder (PNG, any size).
-
-Then run:  npm run compress creatures
-
-That resizes to 256px, converts to WebP, writes into public/art/creatures/,
-and regenerates the manifest automatically.
-
-Do not edit public/art/creatures/ by hand — it gets overwritten.

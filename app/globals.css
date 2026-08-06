@@ -39,7 +39,7 @@ html, body {
   justify-items: center;
   gap: 14px;
   text-align: center;
-  padding: 32px;
+  padding: 32px 28px;
 }
 
 .start-icon {
@@ -48,8 +48,7 @@ html, body {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  border: 1px solid rgba(243, 239, 230, 0.25);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .start-icon img { width: 32px; height: 32px; }
@@ -64,7 +63,7 @@ html, body {
   opacity: 0.72;
   font-size: 14.5px;
   line-height: 1.6;
-  max-width: 42ch;
+  max-width: 62ch;
   text-wrap: balance; /* avoids one lonely word on the last line */
 }
 
@@ -336,4 +335,168 @@ html, body {
   .toast { animation: none; }
   .flash { animation-duration: 60ms; }
   .shutter .inner { transition: none; }
+}
+
+/* ---------- collection badge + sheet ---------- */
+
+.dex-badge {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top));
+  left: 18px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px 7px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(243, 239, 230, 0.16);
+  background: rgba(11, 15, 12, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #f3efe6;
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.dex-badge img { width: 24px; height: 24px; }
+.dex-badge:active { transform: scale(0.96); }
+.dex-badge:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.dex-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8, 10, 9, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: fade 180ms ease;
+}
+
+@keyframes fade { from { opacity: 0; } }
+
+.dex-panel {
+  width: min(420px, 100%);
+  max-height: 76vh;
+  overflow-y: auto;
+  padding: 24px;
+  border-radius: 22px;
+  background: rgba(20, 25, 22, 0.96);
+  border: 1px solid rgba(243, 239, 230, 0.14);
+  animation: rise 220ms ease;
+}
+
+.dex-panel header { text-align: center; margin-bottom: 18px; }
+.dex-panel h2 { font-size: 21px; font-weight: 500; }
+.dex-panel header p { font-size: 13px; opacity: 0.6; margin-top: 4px; }
+
+.dex-empty {
+  text-align: center;
+  opacity: 0.55;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 20px 0;
+}
+
+.dex-list { list-style: none; display: grid; gap: 2px; }
+
+.dex-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: rgba(243, 239, 230, 0.05);
+  font-size: 15px;
+}
+
+.dex-count { opacity: 0.55; font-variant-numeric: tabular-nums; }
+
+.dex-close { width: 100%; margin-top: 18px; }
+
+@media (max-width: 480px) {
+  .dex-badge { padding: 6px 12px 6px 7px; font-size: 13px; }
+  .dex-badge img { width: 21px; height: 21px; }
+}
+
+/* ---------- collection grid ---------- */
+
+.dex-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.dex-cell {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 10px 4px 8px;
+  border-radius: 14px;
+  background: rgba(243, 239, 230, 0.05);
+  border: 1px solid transparent;
+}
+
+.dex-cell.found {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+.dex-art {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+}
+
+.dex-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Uncaught: silhouette the real artwork rather than needing separate files. */
+.dex-cell:not(.found) .dex-art img {
+  filter: brightness(0);
+  opacity: 0.26;
+}
+
+.dex-x {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0b0f0c;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dex-num {
+  font-size: 10px;
+  opacity: 0.4;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.dex-name {
+  font-size: 10.5px;
+  text-align: center;
+  line-height: 1.25;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+
+.dex-cell:not(.found) .dex-name { opacity: 0.35; }
+
+@media (max-width: 380px) {
+  .dex-grid { grid-template-columns: repeat(3, 1fr); }
 }

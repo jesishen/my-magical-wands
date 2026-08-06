@@ -40,6 +40,14 @@ export type Theme = {
   evolves: boolean;
   /** A closed fist catches nearby creatures in an orb. */
   catchable: boolean;
+  /**
+   * "draw"   — trail follows the fingertip (flowers, stars, spells)
+   * "summon" — N fingers spawns one at stage N somewhere on screen, and it
+   *            drifts around until the player catches it.
+   */
+  summonMode: "draw" | "summon";
+  /** Free-roaming speed in summon mode. 0 = stays put. */
+  drift: number;
   /** A closed fist lights the scene: halos fade in and twinkling begins. */
   litByFist: boolean;
   /** Soft halo behind each particle once lit. */
@@ -81,6 +89,8 @@ export const THEMES: Partial<Record<ThemeKey, Theme>> = {
     squash: 0,
     evolves: false,
     catchable: false,
+    summonMode: "draw",
+    drift: 0,
     burstStyle: "explode",
     gravity: 0.12,
     drag: 0.985,
@@ -115,6 +125,8 @@ export const THEMES: Partial<Record<ThemeKey, Theme>> = {
     squash: 0,
     evolves: false,
     catchable: false,
+    summonMode: "draw",
+    drift: 0,
     burstStyle: "shoot",
     gravity: 0.045, // gentler arc for a slower star
     drag: 1,
@@ -150,27 +162,29 @@ export const THEMES: Partial<Record<ThemeKey, Theme>> = {
     squash: 0,
     evolves: false,
     catchable: false,
+    summonMode: "draw",
+    drift: 0,
     burstStyle: "levitate",
     gravity: 0.04,
     drag: 0.97,
     fade: 0.02,
     maxParticles: 400,
   },
-
+*/
   creatures: {
     key: "creatures",
     label: "Creatures",
-    icon: "/icons/creatures.svg",
+    icon: "/icons/creatures.webp",
     path: "/creatures",
-    hint: "1 finger to summon · 2 or 3 to evolve · Fist to catch · Open hand to release",
+    hint: "Hold up 1, 2 or 3 fingers to summon · Open your hand for a ball · Close it over one to catch",
     accent: "#f6c98a",
     manifest: "/art/creatures/manifest.json",
     plantMode: "trail",
     follow: 0.55,
     spacing: 90, // sparse — these are characters, not confetti
     dwellMs: 0,
-    sizeMin: 48,
-    sizeMax: 96,
+    sizeMin: 70,
+    sizeMax: 130,
     breatheAmount: 0.13,
     wander: 1.6, // they drift on their own when you stop
     twinkle: 0,
@@ -180,14 +194,18 @@ export const THEMES: Partial<Record<ThemeKey, Theme>> = {
     squash: 0.5,
     evolves: true,
     catchable: true,
+    summonMode: "summon",
+    drift: 2.3,
     burstStyle: "explode",
     gravity: 0.05,
     drag: 0.98,
     fade: 0.009,
-    maxParticles: 40,
+    maxParticles: 8,
+    litByFist: false,
+    glowHalo: false,
+    glowColor: "#ffffff",
+    glowSize: 2.4,
   },
-*/
-
 };
 
 export const THEME_LIST = Object.values(THEMES).filter(

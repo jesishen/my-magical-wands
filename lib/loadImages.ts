@@ -1,11 +1,18 @@
+/** One evolution line: its base filename and its stages in order. */
+export type Family = {
+  name: string;
+  images: HTMLImageElement[];
+};
+
 export type ArtSet = {
   /** Flat list — what most wands draw from. */
   images: HTMLImageElement[];
   /**
    * Grouped by base filename, for wands with evolution stages.
-   * `ember1.webp`, `ember2.webp`, `ember3.webp` become one family of three.
+   * `emberling1.webp`, `emberling2.webp`, `emberling3.webp` become one
+   * family of three. A file with no trailing digit is a family of one.
    */
-  families: HTMLImageElement[][];
+  families: Family[];
 };
 
 const cache = new Map<string, ArtSet>();
@@ -55,10 +62,10 @@ export async function loadImages(manifestPath: string): Promise<ArtSet> {
     byBase.set(b, list);
   }
 
-  const families: HTMLImageElement[][] = [];
-  for (const list of byBase.values()) {
+  const families: Family[] = [];
+  for (const [name, list] of byBase.entries()) {
     list.sort((a, b) => a.stage - b.stage);
-    families.push(list.map((v) => v.img));
+    families.push({ name, images: list.map((v) => v.img) });
   }
 
   const set: ArtSet = { images: ok.map((v) => v.img), families };
