@@ -175,7 +175,9 @@ export default function WandStage() {
       screenRatio / videoRatio
     );
 
-    const fit = "cover" as const;
+    // Crop when the shapes are close (fills the screen, barely trims anything).
+    // Letterbox when they're badly mismatched, rather than cropping 40%+ away.
+    const fit = mismatch > 1.25 ? "contain" : "cover";
     fitRef.current = fit;
     video.style.objectFit = fit;
   }, []);
