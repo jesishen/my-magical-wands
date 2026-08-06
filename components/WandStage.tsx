@@ -150,12 +150,15 @@ export default function WandStage() {
     const old = video.srcObject as MediaStream | null;
     old?.getTracks().forEach((t) => t.stop());
 
-    // Ask for NO shape — no aspectRatio, no width/height pairing. Any shape
-    // request that the sensor can't natively produce gets satisfied by
-    // digitally cropping it, which is the zoom. Take whatever the camera's
-    // native frame is and let CSS object-fit: cover trim it for the screen.
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user" },
+      video: {
+        facingMode: "user",
+        // Resolution hint only — NOT a shape. aspectRatio, or a width/height
+        // pair, asks for a shape the sensor may not have, and gets satisfied
+        // by cropping it (that was the phone zoom). A lone width just nudges
+        // the camera toward its best native mode instead of its low-res default.
+        width: { ideal: 1920 },
+      },
       audio: false,
     });
 
