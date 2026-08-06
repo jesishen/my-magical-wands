@@ -150,17 +150,12 @@ export default function WandStage() {
     const old = video.srcObject as MediaStream | null;
     old?.getTracks().forEach((t) => t.stop());
 
-    // No aspectRatio here. iOS satisfies that constraint by digitally cropping
-    // the sensor, which is what made the picture look zoomed way in. Ask only
-    // for a resolution and let the camera give its native, uncropped frame —
-    // object-fit: cover then trims the edges, keeping ~82% of it.
-    const portrait = window.innerHeight > window.innerWidth;
+    // Ask for NO shape — no aspectRatio, no width/height pairing. Any shape
+    // request that the sensor can't natively produce gets satisfied by
+    // digitally cropping it, which is the zoom. Take whatever the camera's
+    // native frame is and let CSS object-fit: cover trim it for the screen.
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: "user",
-        width: { ideal: portrait ? 720 : 1280 },
-        height: { ideal: portrait ? 1280 : 720 },
-      },
+      video: { facingMode: "user" },
       audio: false,
     });
 
