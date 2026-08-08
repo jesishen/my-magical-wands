@@ -673,6 +673,7 @@ export default function WandStage() {
           <h1>Magical Wands</h1>
           <h4>Your current abilities:</h4> <p>Draw Flowers, Create Constellations, Spawn and Catch Pokemon!</p>
           <h4>Your upcoming abilities:</h4> <p>I'm trying to do something to do with Harry Potter...</p>
+          <p>Created by Jessica Shen</p>
           {error && <p className="error">{error}</p>}
           <button className="primary" onClick={start} disabled={status !== ""}>
             {status || "Start camera"}
